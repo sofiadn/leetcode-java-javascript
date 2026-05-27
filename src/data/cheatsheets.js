@@ -475,5 +475,192 @@ function Animal(name) { this.name = name; }
 Animal.prototype.speak = function() { return this.name; };`
       }
     ]
+  },
+  {
+    id: "react-patterns",
+    title: "React patterns",
+    category: "React",
+    content: [
+      {
+        heading: "useState",
+        code: `const [value, setValue] = useState(initialValue);
+
+// examples
+const [count, setCount]   = useState(0);
+const [open, setOpen]     = useState(false);
+const [name, setName]     = useState("");
+const [form, setForm]     = useState({ name: "", email: "" });
+
+// updating
+setCount(5);                              // set directly
+setCount(prev => prev + 1);              // use previous value (safer)
+setForm(prev => ({ ...prev, name: "Sofia" })); // update one field`
+      },
+      {
+        heading: "useEffect",
+        code: `// runs on mount only
+useEffect(() => {
+  fetchData();
+}, []);
+
+// runs when dep changes
+useEffect(() => {
+  document.title = count;
+}, [count]);
+
+// cleanup — runs before next effect or unmount
+useEffect(() => {
+  const sub = subscribe();
+  return () => sub.unsubscribe();
+}, []);
+
+// fetch pattern
+useEffect(() => {
+  let cancelled = false;
+  async function load() {
+    const data = await fetchSomething();
+    if (!cancelled) setData(data);
+  }
+  load();
+  return () => { cancelled = true; };
+}, [id]);`
+      },
+      {
+        heading: "useRef",
+        code: `const ref = useRef(initialValue);  // read — does NOT trigger re-render
+
+// common uses
+const inputRef = useRef(null);
+<input ref={inputRef} />
+inputRef.current.focus();  // imperative DOM access
+
+// store previous value
+const prevCount = useRef(count);
+useEffect(() => {
+  prevCount.current = count;
+}, [count]);`
+      },
+      {
+        heading: "useCallback",
+        code: `const handleClick = useCallback(() => {
+  doSomethingWith(id);
+}, [id]);  // only recreates when id changes
+
+// use: avoid triggering child re-renders
+// when a child wrapped in React.memo receives a function prop,
+// without useCallback the function is a new reference every render`
+      },
+      {
+        heading: "useMemo",
+        code: `const expensiveResult = useMemo(() => {
+  return computeExpensiveThing(data);
+}, [data]);  // only recomputes when data changes
+
+// use: expensive derivations — filtering large lists,
+// complex transformations. Don't overuse for cheap ops.`
+      },
+      {
+        heading: "Context",
+        code: `// create
+const ThemeContext = createContext("light");
+
+// provide
+<ThemeContext.Provider value="dark">
+  <App />
+</ThemeContext.Provider>
+
+// consume
+const theme = useContext(ThemeContext);
+
+// avoids prop drilling for global state: theme, auth, locale`
+      },
+      {
+        heading: "Controlled inputs / forms",
+        code: `// controlled — React owns the value
+const [value, setValue] = useState("");
+<input value={value} onChange={e => setValue(e.target.value)} />
+
+// common form pattern
+const [form, setForm] = useState({ name: "", email: "" });
+const handleChange = e => {
+  setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+};
+<input name="name"  value={form.name}  onChange={handleChange} />
+<input name="email" value={form.email} onChange={handleChange} />`
+      },
+      {
+        heading: "Lists & conditional rendering",
+        code: `// always provide a stable key
+items.map(item => (
+  <li key={item.id}>{item.name}</li>
+));
+// Never use index as key if list can reorder
+
+// conditional rendering
+{isLoading && <Spinner />}
+{error ? <Error msg={error} /> : <Data />}
+{user && <Profile user={user} />}`
+      },
+      {
+        heading: "Async state (data fetching)",
+        code: `const [data,      setData]      = useState(null);
+const [isLoading, setIsLoading] = useState(true);
+const [error,     setError]     = useState(null);
+
+useEffect(() => {
+  fetch("/api/data")
+    .then(res => { if (!res.ok) throw new Error("Failed"); return res.json(); })
+    .then(data => setData(data))
+    .catch(err => setError(err.message))
+    .finally(() => setIsLoading(false));
+}, []);
+
+if (isLoading) return <p>Loading...</p>;
+if (error)     return <p>Error: {error}</p>;
+return <div>{data.title}</div>;`
+      },
+      {
+        heading: "Component structure",
+        code: `function MyComponent({ title, onClose }) {  // props destructured
+  const [open, setOpen] = useState(false);   // state
+
+  useEffect(() => {                           // side effects
+    document.title = title;
+  }, [title]);
+
+  const handleClick = () => setOpen(true);   // handlers
+  const handleClose = () => { setOpen(false); onClose(); };
+
+  return (                                   // JSX
+    <div>
+      <h1>{title}</h1>
+      <button onClick={handleClick}>Open</button>
+      {open && <Modal onClose={handleClose} />}
+    </div>
+  );
+}`
+      },
+      {
+        heading: "Common bugs",
+        code: `// 1. Stale closure — state captured at render time
+useEffect(() => {
+  setInterval(() => console.log(count), 1000); // always logs initial count
+}, []);
+// fix: add count to dep array, or use a ref
+
+// 2. State batching — setCount called twice = +1 not +2
+setCount(count + 1);  // stale
+setCount(count + 1);  // stale (same count)
+setCount(prev => prev + 1);  // correct — uses latest
+
+// 3. Object state — always spread
+setState({ name: "Sofia" });               // loses other fields
+setState(prev => ({ ...prev, name: "Sofia" }));  // correct
+
+// 4. Direct mutation — no re-render
+state.items.push(newItem);                 // wrong
+setState([...items, newItem]);             // correct`
+      },
+    ]
   }
 ];
