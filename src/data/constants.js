@@ -1,7 +1,8 @@
 export const CATEGORY_COLORS = {
   Java: { bg: "#EEEDFE", text: "#3C3489", border: "#AFA9EC" },
   JS:   { bg: "#FAEEDA", text: "#633806", border: "#EF9F27" },
-  React:{ bg: "#E1F5EE", text: "#085041", border: "#5DCAA5" },
+  React:  { bg: "#E1F5EE", text: "#085041", border: "#5DCAA5" },
+  Spring: { bg: "#E8F5E3", text: "#2d5a1b", border: "#6db85a" },
 };
 
 export const DIFF_COLORS = {

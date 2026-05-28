@@ -662,5 +662,262 @@ state.items.push(newItem);                 // wrong
 setState([...items, newItem]);             // correct`
       },
     ]
+  },
+  {
+    id: "spring-boot",
+    title: "Spring Boot",
+    category: "Spring",
+    content: [
+      {
+        heading: "Project setup & entry point",
+        code: `// pom.xml parent
+<parent>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-parent</artifactId>
+  <version>3.2.0</version>
+</parent>
+
+// common starters
+spring-boot-starter-web          // REST, embedded Tomcat
+spring-boot-starter-data-jpa     // Hibernate + JPA
+spring-boot-starter-validation   // Bean Validation
+spring-boot-starter-security     // Spring Security
+
+// main class
+@SpringBootApplication  // = @Configuration + @EnableAutoConfiguration + @ComponentScan
+public class App {
+  public static void main(String[] args) {
+    SpringApplication.run(App.class, args);
+  }
+}`
+      },
+      {
+        heading: "REST controller",
+        code: `@RestController                // = @Controller + @ResponseBody
+@RequestMapping("/api/users")
+public class UserController {
+
+  @GetMapping                    // GET /api/users
+  public List<User> getAll() { ... }
+
+  @GetMapping("/{id}")           // GET /api/users/42
+  public User getById(@PathVariable Long id) { ... }
+
+  @PostMapping                   // POST /api/users
+  public User create(@RequestBody @Valid UserDto dto) { ... }
+
+  @PutMapping("/{id}")           // PUT /api/users/42
+  public User update(@PathVariable Long id, @RequestBody UserDto dto) { ... }
+
+  @DeleteMapping("/{id}")        // DELETE /api/users/42
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(@PathVariable Long id) { ... }
+}`
+      },
+      {
+        heading: "Request binding",
+        code: `// path variable
+@GetMapping("/{id}")
+public User get(@PathVariable Long id) { ... }
+
+// query param  GET /users?page=0&size=10
+@GetMapping
+public List<User> list(@RequestParam(defaultValue = "0") int page,
+                       @RequestParam(defaultValue = "10") int size) { ... }
+
+// request body (JSON → object)
+@PostMapping
+public User create(@RequestBody UserDto dto) { ... }
+
+// request header
+public void act(@RequestHeader("Authorization") String token) { ... }`
+      },
+      {
+        heading: "ResponseEntity",
+        code: `@GetMapping("/{id}")
+public ResponseEntity<User> get(@PathVariable Long id) {
+  return userService.findById(id)
+    .map(ResponseEntity::ok)                           // 200
+    .orElse(ResponseEntity.notFound().build());         // 404
+}
+
+@PostMapping
+public ResponseEntity<User> create(@RequestBody UserDto dto) {
+  User saved = userService.save(dto);
+  URI location = URI.create("/api/users/" + saved.getId());
+  return ResponseEntity.created(location).body(saved); // 201
+}`
+      },
+      {
+        heading: "Service & dependency injection",
+        code: `@Service
+public class UserService {
+
+  private final UserRepository repo;  // constructor injection — preferred over @Autowired
+
+  public UserService(UserRepository repo) {
+    this.repo = repo;
+  }
+
+  public User save(UserDto dto) {
+    return repo.save(new User(dto.getName(), dto.getEmail()));
+  }
+}
+
+// stereotype annotations
+@Component    // generic bean
+@Service      // business logic layer
+@Repository   // data layer — also translates DB exceptions
+@Controller   // web layer`
+      },
+      {
+        heading: "JPA entity",
+        code: `@Entity
+@Table(name = "users")
+public class User {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(nullable = false, length = 100)
+  private String name;
+
+  @Column(unique = true, nullable = false)
+  private String email;
+
+  @CreationTimestamp
+  private LocalDateTime createdAt;
+}`
+      },
+      {
+        heading: "JPA repository",
+        code: `// extend JpaRepository — CRUD + paging for free
+public interface UserRepository extends JpaRepository<User, Long> {
+
+  // derived queries — Spring generates SQL from method name
+  Optional<User> findByEmail(String email);
+  List<User> findByNameContainingIgnoreCase(String name);
+  boolean existsByEmail(String email);
+
+  // custom JPQL
+  @Query("SELECT u FROM User u WHERE u.createdAt > :since")
+  List<User> findRecent(@Param("since") LocalDateTime since);
+
+  // native SQL
+  @Query(value = "SELECT * FROM users WHERE role = ?1", nativeQuery = true)
+  List<User> findByRole(String role);
+}`
+      },
+      {
+        heading: "Validation",
+        code: `// DTO with constraints
+public class UserDto {
+  @NotBlank
+  @Size(min = 2, max = 100)
+  private String name;
+
+  @Email @NotNull
+  private String email;
+
+  @Min(0) @Max(150)
+  private int age;
+}
+
+// enable in controller — throws MethodArgumentNotValidException on failure
+public User create(@RequestBody @Valid UserDto dto) { ... }
+
+// handle globally
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Map<String, String> handleValidation(MethodArgumentNotValidException ex) {
+    Map<String, String> errors = new HashMap<>();
+    ex.getBindingResult().getFieldErrors()
+      .forEach(e -> errors.put(e.getField(), e.getDefaultMessage()));
+    return errors;
+  }
+}`
+      },
+      {
+        heading: "Exception handling",
+        code: `// custom exception
+public class NotFoundException extends RuntimeException {
+  public NotFoundException(String msg) { super(msg); }
+}
+
+// throw in service
+public User findById(Long id) {
+  return repo.findById(id)
+    .orElseThrow(() -> new NotFoundException("User " + id + " not found"));
+}
+
+// catch globally
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+  @ExceptionHandler(NotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public Map<String, String> notFound(NotFoundException ex) {
+    return Map.of("error", ex.getMessage());
+  }
+
+  @ExceptionHandler(Exception.class)
+  @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+  public Map<String, String> generic(Exception ex) {
+    return Map.of("error", "Something went wrong");
+  }
+}`
+      },
+      {
+        heading: "application.properties",
+        code: `server.port=8080
+
+# PostgreSQL
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
+spring.datasource.username=postgres
+spring.datasource.password=secret
+
+# JPA
+spring.jpa.hibernate.ddl-auto=update  # create | validate | none
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# H2 in-memory (dev/test)
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.h2.console.enabled=true
+
+# custom property — inject with @Value("${app.jwt.secret}")
+app.jwt.secret=mysecret
+app.jwt.expiry=86400000`
+      },
+      {
+        heading: "@Transactional & DTOs",
+        code: `@Service
+public class OrderService {
+
+  @Transactional               // commit on success, rollback on RuntimeException
+  public Order placeOrder(OrderDto dto) {
+    Order order = orderRepo.save(new Order(dto));
+    inventoryService.deduct(dto.getItems());  // same transaction
+    return order;
+  }
+
+  @Transactional(readOnly = true)  // hint to DB — no flush, faster reads
+  public List<Order> getByUser(Long userId) {
+    return orderRepo.findByUserId(userId);
+  }
+}
+
+// DTOs — never expose entities directly to the API
+record UserDto(String name, String email) {}      // Java 16+
+record UserResponse(Long id, String name) {}
+
+UserResponse toResponse(User u) {
+  return new UserResponse(u.getId(), u.getName());
+}`
+      },
+    ]
   }
 ];
